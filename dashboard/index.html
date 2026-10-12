@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wsgc-EPG 仪表盘</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-inner">
+                <div class="header-left">
+                    <h1 class="title">wsgc-EPG 仪表盘</h1>
+
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="section" id="overviewSection">
+                <h2 class="section-title">总体概览</h2>
+                <div class="stat-grid" id="statGrid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statChannels">--</div>
+                        <div class="stat-label">频道数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statPrograms">--</div>
+                        <div class="stat-label">节目数</div>
+                    </div>
+                    <div class="stat-card highlight">
+                        <div class="stat-value" id="statMatchRate">--</div>
+                        <div class="stat-label">Desc匹配率</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTimeRange" style="font-size:16px">--</div>
+                        <div class="stat-label">EPG时间范围</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="updateTime" style="font-size:16px">--</div>
+                        <div class="stat-label">更新时间</div>
+                    </div>
+                </div>
+                <div class="epg-status" id="epgStatus">正在加载EPG数据...</div>
+            </section>
+
+            <section class="section" id="downloadSection">
+                <h2 class="section-title">📥 EPG 下载地址</h2>
+                <div class="download-list">
+                    <div class="download-item">
+                        <div class="download-info">
+                            <span class="download-label">带Desc描述（直连）</span>
+                            <code class="download-url">https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc-desc.xml.gz</code>
+                        </div>
+                        <div class="download-actions">
+                            <button class="btn-sm btn-copy" data-url="https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc-desc.xml.gz">📋 复制</button>
+                            <button class="btn-sm btn-download" data-url="https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc-desc.xml.gz">⬇ 下载</button>
+                        </div>
+                    </div>
+                    <div class="download-item">
+                        <div class="download-info">
+                            <span class="download-label">不带描述（直连）</span>
+                            <code class="download-url">https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc.xml.gz</code>
+                        </div>
+                        <div class="download-actions">
+                            <button class="btn-sm btn-copy" data-url="https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc.xml.gz">📋 复制</button>
+                            <button class="btn-sm btn-download" data-url="https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc.xml.gz">⬇ 下载</button>
+                        </div>
+                    </div>
+                    <div class="download-item">
+                        <div class="download-info">
+                            <span class="download-label">带Desc描述（加速）</span>
+                            <code class="download-url">https://gh-proxy.org/https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc-desc.xml.gz</code>
+                        </div>
+                        <div class="download-actions">
+                            <button class="btn-sm btn-copy" data-url="https://gh-proxy.org/https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc-desc.xml.gz">📋 复制</button>
+                            <button class="btn-sm btn-download" data-url="https://gh-proxy.org/https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc-desc.xml.gz">⬇ 下载</button>
+                        </div>
+                    </div>
+                    <div class="download-item">
+                        <div class="download-info">
+                            <span class="download-label">不带描述（加速）</span>
+                            <code class="download-url">https://gh-proxy.org/https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc.xml.gz</code>
+                        </div>
+                        <div class="download-actions">
+                            <button class="btn-sm btn-copy" data-url="https://gh-proxy.org/https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc.xml.gz">📋 复制</button>
+                            <button class="btn-sm btn-download" data-url="https://gh-proxy.org/https://github.com/wzy80119-cell/wsgc-EPG/raw/main/EPG/wsgc.xml.gz">⬇ 下载</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section" id="channelsSection">
+                <h2 class="section-title">
+                    频道列表
+                    <span class="count-badge" id="channelCount">0</span>
+                    <span class="section-hint">点击频道可查看详细节目单</span>
+                </h2>
+                <div class="group-buttons" id="groupButtons"></div>
+                <div class="toolbar">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索频道名称或 tvg-id...">
+                    <select class="sort-select" id="sortSelect">
+                        <option value="name">按名称排序</option>
+                        <option value="matchRate">按匹配率排序</option>
+                        <option value="programCount">按节目数排序</option>
+                        <option value="todayCount">按今日节目排序</option>
+                    </select>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table" id="channelTable">
+                        <thead>
+                            <tr>
+                                <th>频道名称</th>
+                                <th>tvg-id</th>
+                                <th>分组</th>
+                                <th class="num">节目总数</th>
+                                <th class="num">今日节目</th>
+                                <th class="num">匹配率</th>
+                                <th>间隙</th>
+                            </tr>
+                        </thead>
+                        <tbody id="channelTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <span>wsgc-EPG Dashboard</span>
+            <span class="footer-sep">·</span>
+            <a href="../dashboard-old/" class="footer-link">旧版仪表盘</a>
+            <span class="footer-sep">·</span>
+            <a href="https://github.com/wzy80119-cell/wsgc-EPG" class="footer-link" target="_blank">GitHub</a>
+        </footer>
+    </div>
+
+    <div class="modal" id="channelModal" style="display:none">
+        <div class="modal-overlay" onclick="closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">节目单</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-channel-info" id="modalChannelInfo"></div>
+            <div class="modal-date-bar" id="modalDateBar"></div>
+            <div class="modal-body" id="modalBody">
+                <div class="modal-loading">
+                    <div class="loading-spinner"></div>
+                    <p>正在加载节目单...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <p>正在加载数据...</p>
+    </div>
+
+    <div class="error" id="error" style="display:none">
+        <p id="errorMsg"></p>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

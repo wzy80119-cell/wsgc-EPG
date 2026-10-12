@@ -1,0 +1,14 @@
+{
+  "provinces": [
+    {
+      "id": "370000",
+      "name": "山东",
+      "enabled": true
+    },
+    {
+      "id": "420000",
+      "name": "湖北",
+      "enabled": true
+    }
+  ]
+}

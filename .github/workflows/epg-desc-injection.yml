@@ -1,0 +1,157 @@
+name: EPG Desc注入
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'EPG/wsgc.xml.gz'
+  workflow_dispatch:
+    inputs:
+      run_extract:
+        description: '运行 Desc 提取（别家EPG）'
+        required: true
+        default: true
+        type: boolean
+      run_inject:
+        description: '运行 Desc 注入'
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: epg-desc-injection
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================
+  #  从别家EPG提取desc (extract_desc.py)
+  # ============================================================
+  extract-desc:
+    if: ${{ github.event_name == 'push' || github.event.inputs.run_extract == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests lxml beautifulsoup4
+
+    - name: Run extract_desc.py
+      id: extract
+      continue-on-error: true
+      run: |
+        python scripts/extract_desc.py \
+          --config config/desc_config.json \
+          --output database/desc_database.json \
+          --log-dir log
+
+    - name: Commit and push
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add database/desc_database.json log/desc_database_log.txt
+
+        if git diff --staged --quiet; then
+          echo "No changes to extract-desc"
+        else
+          git commit -m "提取Desc $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          git fetch origin ${{ github.ref_name }}
+          if ! git rebase origin/${{ github.ref_name }} -X theirs; then
+            echo "::warning::Rebase failed, falling back to reset+recommit"
+            git rebase --abort
+            git reset --soft origin/${{ github.ref_name }}
+            git add database/desc_database.json log/desc_database_log.txt
+            git commit -m "提取Desc $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          fi
+          git push
+        fi
+
+  # ============================================================
+  #  注入desc生成wsgc-desc.xml.gz (add_desc.py)
+  #  等待提取完成后执行
+  # ============================================================
+  inject-desc:
+    needs: [extract-desc]
+    if: ${{ always() && (github.event_name == 'push' || github.event.inputs.run_inject == 'true') }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: pip install requests lxml beautifulsoup4
+
+    - name: Wait for GitHub raw URLs to update
+      run: |
+        echo "等待 15 秒，确保上游提交已同步到 raw.githubusercontent.com"
+        sleep 15
+
+    - name: Run add_desc.py (注入Desc)
+      id: inject
+      continue-on-error: true
+      run: |
+        python scripts/add_desc.py \
+          --input ./EPG/wsgc.xml.gz \
+          --desc-db-url "https://raw.githubusercontent.com/wzy80119-cell/wsgc-EPG/refs/heads/main/database/desc_database.json,https://raw.githubusercontent.com/wzy80119-cell/wsgc-EPG/refs/heads/main/database/apidb.json" \
+          --man-made-url "https://raw.githubusercontent.com/wzy80119-cell/wsgc-EPG/refs/heads/main/database/man-made.json" \
+          --output ./EPG/wsgc-desc.xml.gz \
+          --log ./log/desc_match_log.txt
+
+    - name: Generate dashboard summary (解析xml生成概要log)
+      if: always() && steps.inject.outcome == 'success'
+      run: |
+        python scripts/generate_dashboard_summary.py \
+          --input ./EPG/wsgc-desc.xml.gz \
+          --log ./log/desc_match_log.json
+
+
+    - name: Commit and push
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add EPG/wsgc-desc.xml.gz log/desc_match_log.txt log/desc_match_log.json
+
+        if git diff --staged --quiet; then
+          echo "No changes to inject-desc"
+        else
+          git commit -m "注入Desc $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          git fetch origin ${{ github.ref_name }}
+          if ! git rebase origin/${{ github.ref_name }} -X theirs; then
+            echo "::warning::Rebase failed, falling back to reset+recommit"
+            git rebase --abort
+            git reset --soft origin/${{ github.ref_name }}
+            git add EPG/wsgc-desc.xml.gz log/desc_match_log.txt log/desc_match_log.json
+            git commit -m "注入Desc $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          fi
+          git push
+          echo "Desc注入完成"
+        fi
+
+    - name: Summary
+      if: always()
+      run: |
+        echo "=== Desc注入 结果 ==="
+        echo "提取Desc: ${{ needs.extract-desc.result }}"
+        echo "注入Desc: ${{ steps.inject.outcome }}"
+        echo "=============================="

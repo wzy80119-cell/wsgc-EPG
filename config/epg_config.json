@@ -1,0 +1,19 @@
+{
+  "generator": "往事如风",
+  "skeleton": "EPG/wsgc.xml.gz",
+  "output_name": "wsgc.xml.gz",
+  "days_back": 1,
+  "days_forward": 6,
+  "overlap_threshold": 0.5,
+  "sources": [
+    { "name": "SDM", "file": "EPG/sdm.xml.gz", "enabled": true },
+    { "name": "wsgc-sdu", "file": "EPG_Temp/sduiptv.xml.gz", "enabled": true },
+    { "name": "SDGD", "file": "EPG/sdgd.xml.gz", "enabled": true },
+    { "name": "tv-sou", "file": "EPG/tvsou.xml", "enabled": true },
+    { "name": "tv-mao", "file": "EPG/tvmao.xml", "enabled": true },
+    { "name": "zmt", "url": "http://epg.51zmt.top:8000/e1.xml.gz", "enabled": true },
+    { "name": "mxdyeah", "url": "https://tv.mxdyeah.top/epgphp/t.xml.gz", "enabled": true },
+    { "name": "epgpw", "url": "https://epg.pw/xmltv/epg.xml.gz", "enabled": true },
+    { "name": "占位", "file": "EPG/false.xml.gz", "enabled": true }
+  ]
+}

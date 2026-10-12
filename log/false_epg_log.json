@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-10-11T20:39:10.208342",
+  "channels_count": 11,
+  "programs_per_channel": 72,
+  "total_programs": 792,
+  "date_range": {
+    "yesterday": "2026-10-10",
+    "today": "2026-10-11",
+    "tomorrow": "2026-10-12"
+  },
+  "channels": [
+    {
+      "id": "山东海洋频道",
+      "name": "山东海洋频道",
+      "program_count": 1
+    },
+    {
+      "id": "临朐综合",
+      "name": "临朐综合",
+      "program_count": 1
+    },
+    {
+      "id": "奎文电视台",
+      "name": "奎文电视台",
+      "program_count": 1
+    },
+    {
+      "id": "青州综合",
+      "name": "青州综合",
+      "program_count": 1
+    },
+    {
+      "id": "青州文化旅游",
+      "name": "青州文化旅游",
+      "program_count": 1
+    },
+    {
+      "id": "诸城综合",
+      "name": "诸城综合",
+      "program_count": 1
+    },
+    {
+      "id": "寿光综合",
+      "name": "寿光综合",
+      "program_count": 1
+    },
+    {
+      "id": "寿光蔬菜",
+      "name": "寿光蔬菜",
+      "program_count": 1
+    },
+    {
+      "id": "安丘综合",
+      "name": "安丘综合",
+      "program_count": 1
+    },
+    {
+      "id": "高密综合",
+      "name": "高密综合",
+      "program_count": 1
+    },
+    {
+      "id": "昌邑综合",
+      "name": "昌邑综合",
+      "program_count": 1
+    }
+  ]
+}

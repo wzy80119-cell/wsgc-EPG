@@ -1,0 +1,474 @@
+#!/usr/bin/env python3
+"""
+EPG Desc 提取器
+扁平化数据结构 - 新格式: [ { channel, title, desc }, ... ]
+"""
+import os
+import sys
+import json
+import logging
+import argparse
+import gzip
+import re
+import html
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
+import requests
+from pathlib import Path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from clean_utils import ChannelCleanRuleManager, clean_program_title_with_rule, normalize
+
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+class DescDatabase:
+    def __init__(self):
+        self.entries = []
+
+    def norm_key(self, channel, title):
+        ch_norm = channel.lower().replace(' ', '').replace('-', '').replace('_', '')
+        title_norm = title.lower().replace(' ', '').replace('-', '').replace('_', '')
+        return f"{ch_norm}|||{title_norm}"
+
+    def add(self, channel, title, desc):
+        key = self.norm_key(channel, title)
+        for entry in self.entries:
+            if self.norm_key(entry['channel'], entry['title']) == key:
+                if len(desc) > len(entry['desc']):
+                    entry['desc'] = desc
+                return False
+        self.entries.append({
+            'channel': channel,
+            'title': title,
+            'desc': desc
+        })
+        return True
+
+    def load_from_list(self, data):
+        if isinstance(data, list):
+            self.entries = data
+        elif isinstance(data, dict):
+            for channel, programs in data.items():
+                for title, info in programs.items():
+                    self.entries.append({
+                        'channel': info.get('channel', channel),
+                        'title': info.get('title', title),
+                        'desc': info.get('desc', '')
+                    })
+
+    def save(self):
+        return self.entries
+
+    def get_stats(self):
+        channels = set(e['channel'] for e in self.entries)
+        return {
+            'total': len(self.entries),
+            'channels': len(channels)
+        }
+
+    def get_channel_counts(self):
+        counts = {}
+        for e in self.entries:
+            ch = e['channel']
+            counts[ch] = counts.get(ch, 0) + 1
+        return counts
+
+
+class DescExtractor:
+    def __init__(self, config_path, output_path, log_dir='log'):
+        self.config_path = config_path
+        self.output_path = output_path
+        self.log_dir = log_dir
+        self.config = None
+
+        self.target_channels = {}
+        self.desc_db = DescDatabase()
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        rules_path = os.path.join(script_dir, '..', 'config', 'channel_clean_rules.json')
+        self.rule_manager = ChannelCleanRuleManager(rules_path)
+
+        self.invalid_desc_patterns = [
+            r'^暂无节目描述',
+            r'^暂无描述',
+            r'^暂无简介',
+            r'^暂无内容',
+            r'^无节目描述',
+            r'^无描述',
+            r'^无简介',
+            r'^10月1日e域名头关闭',
+        ]
+
+        self.stats = {
+            'sources_processed': 0,
+            'total_descs': 0,
+            'new_descs': 0,
+            'deduplicated': 0,
+            'invalid_filtered': 0,
+            'html_fixed': 0,
+            'channels_with_desc': 0
+        }
+
+    def normalize(self, text):
+        if not text:
+            return ""
+        text = re.sub(r'[\s\-_\+\|\(\)（）\[\]【】《》:：·""\'Mo\-—～~]', '', text)
+        return text.lower()
+
+    def fix_html_entities(self, text):
+        if not text:
+            return text
+
+        original = text
+        fixed = text
+
+        for _ in range(10):
+            decoded = html.unescape(fixed)
+            if decoded == fixed:
+                break
+            fixed = decoded
+
+        replacements = [
+            ('<', '《'),
+            ('>', '》'),
+            ('&lt;', '《'),
+            ('&gt;', '》'),
+            ('&quot;', '"'),
+            ('&apos;', "'"),
+            ('&nbsp;', ' '),
+            ('&amp;', '&'),
+        ]
+
+        for old, new in replacements:
+            fixed = fixed.replace(old, new)
+
+        fixed = re.sub(r'\s+', ' ', fixed).strip()
+
+        if fixed != original:
+            self.stats['html_fixed'] += 1
+
+        return fixed
+
+    def is_valid_desc(self, desc):
+        if not desc:
+            return False
+
+        desc_clean = desc.strip()
+
+        if len(desc_clean) < 5:
+            return False
+
+        for pattern in self.invalid_desc_patterns:
+            if re.match(pattern, desc_clean, re.IGNORECASE):
+                self.stats['invalid_filtered'] += 1
+                return False
+
+        return True
+
+    def clean_program_title(self, title, channel_name):
+        if not title:
+            return "", "", False
+
+        original = title.strip()
+        cleaned = clean_program_title_with_rule(original, channel_name, self.rule_manager)
+
+        is_cleaned = (cleaned != original)
+
+        return cleaned, original, is_cleaned
+
+    def load_config(self):
+        with open(self.config_path, 'r', encoding='utf-8') as f:
+            self.config = json.load(f)
+        logger.info("配置加载完成")
+
+    def download_epg(self, url, compressed=True):
+        try:
+            if url.startswith(('http://', 'https://')):
+                logger.info(f"下载: {url[:80]}...")
+                response = requests.get(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }, timeout=120)
+                response.raise_for_status()
+                content = response.content
+            else:
+                with open(url, 'rb') as f:
+                    content = f.read()
+
+            if compressed:
+                try:
+                    content = gzip.decompress(content)
+                except:
+                    pass
+
+            return content
+        except Exception as e:
+            logger.error(f"下载失败 {url}: {e}")
+            return None
+
+    def load_target_channels(self):
+        ref_epg = self.config.get('reference_epg')
+        if not ref_epg:
+            logger.error("配置中缺少 reference_epg")
+            return False
+
+        content = self.download_epg(ref_epg['url'], ref_epg.get('compressed', True))
+        if not content:
+            return False
+
+        try:
+            root = ET.fromstring(content)
+
+            for channel in root.findall('.//channel'):
+                display_names = channel.findall('display-name')
+                if not display_names:
+                    continue
+
+                first_name = display_names[0].text.strip() if display_names[0].text else None
+                if not first_name:
+                    continue
+
+                for dn in display_names:
+                    if dn.text:
+                        alias = dn.text.strip()
+                        norm_alias = self.normalize(alias)
+                        self.target_channels[norm_alias] = first_name
+
+            unique_channels = len(set(self.target_channels.values()))
+            logger.info(f"目标频道数: {unique_channels}, 别名总数: {len(self.target_channels)}")
+            return True
+
+        except Exception as e:
+            logger.error(f"解析参考EPG失败: {e}")
+            return False
+
+    def get_canonical_channel(self, channel_name):
+        norm = self.normalize(channel_name)
+        if norm in self.target_channels:
+            return self.target_channels[norm], True
+        return channel_name, False
+
+    def extract_from_source(self, epg_config, source_name):
+        content = self.download_epg(epg_config['url'], epg_config.get('compressed', True))
+        if not content:
+            return
+
+        try:
+            root = ET.fromstring(content)
+
+            channel_map = {}
+            for ch in root.findall('.//channel'):
+                cid = ch.get('id')
+                display_names = ch.findall('display-name')
+                if display_names and display_names[0].text:
+                    channel_map[cid] = display_names[0].text.strip()
+
+            count = 0
+            dedup_count = 0
+            total_programs = 0
+
+            for prog in root.findall('.//programme'):
+                cid = prog.get('channel')
+                source_channel_name = channel_map.get(cid, '')
+
+                canonical_name, is_target = self.get_canonical_channel(source_channel_name)
+                if not is_target:
+                    continue
+
+                title_elem = prog.find('title')
+                desc_elem = prog.find('desc')
+
+                if title_elem is None or not title_elem.text:
+                    continue
+                if desc_elem is None or not desc_elem.text:
+                    continue
+
+                total_programs += 1
+                original_title = title_elem.text.strip()
+                raw_desc = desc_elem.text.strip()
+
+                desc = self.fix_html_entities(raw_desc)
+
+                if not self.is_valid_desc(desc):
+                    continue
+
+                cleaned_title, _, was_cleaned = self.clean_program_title(original_title, canonical_name)
+
+                if was_cleaned:
+                    dedup_count += 1
+
+                if self.desc_db.add(canonical_name, cleaned_title, desc):
+                    count += 1
+                    self.stats['new_descs'] += 1
+
+            self.stats['deduplicated'] += dedup_count
+            logger.info(f"{source_name}: 提取 {count} 条, 去重 {dedup_count} 条")
+            self.stats['sources_processed'] += 1
+
+        except Exception as e:
+            logger.error(f"解析失败 {source_name}: {e}")
+
+    def filter_invalid_existing(self):
+        before = len(self.desc_db.entries)
+        self.desc_db.entries = [
+            e for e in self.desc_db.entries
+            if self.is_valid_desc(e.get('desc', ''))
+        ]
+        removed = before - len(self.desc_db.entries)
+        if removed > 0:
+            logger.info(f"过滤已存数据库无效描述: {removed} 条")
+
+    def load_existing_db(self):
+        existing_path = self.config.get('existing_db')
+
+        if existing_path and existing_path.startswith(('http://', 'https://')):
+            try:
+                logger.info(f"从URL加载现有数据库...")
+                response = requests.get(existing_path, timeout=30)
+                if response.status_code == 200:
+                    data = response.json()
+                    self.desc_db.load_from_list(data)
+                    self.filter_invalid_existing()
+                    stats = self.desc_db.get_stats()
+                    logger.info(f"加载现有数据库: {stats['total']} 条记录, {stats['channels']} 个频道")
+                    return
+            except Exception as e:
+                logger.warning(f"从URL加载失败: {e}")
+
+        if os.path.exists(self.output_path):
+            try:
+                with open(self.output_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                self.desc_db.load_from_list(data)
+                self.filter_invalid_existing()
+                stats = self.desc_db.get_stats()
+                logger.info(f"加载本地数据库: {stats['total']} 条记录, {stats['channels']} 个频道")
+            except Exception as e:
+                logger.warning(f"加载本地数据库失败: {e}")
+                self.desc_db = DescDatabase()
+        else:
+            logger.info("无现有数据库，将创建新文件")
+
+    def save_database(self):
+        os.makedirs(os.path.dirname(self.output_path) or '.', exist_ok=True)
+
+        stats = self.desc_db.get_stats()
+        self.stats['channels_with_desc'] = stats['channels']
+        self.stats['total_descs'] = stats['total']
+
+        with open(self.output_path, 'w', encoding='utf-8') as f:
+            json.dump(self.desc_db.save(), f, ensure_ascii=False, indent=2)
+
+        file_size = os.path.getsize(self.output_path)
+        size_str = f"{file_size / 1024:.1f}KB" if file_size < 1024*1024 else f"{file_size / 1024 / 1024:.1f}MB"
+
+        logger.info(f"数据库已保存: {self.output_path} ({size_str})")
+        logger.info(f"频道数: {self.stats['channels_with_desc']}, Desc总数: {self.stats['total_descs']}")
+        logger.info(f"HTML修复: {self.stats['html_fixed']}, 无效过滤: {self.stats['invalid_filtered']}")
+
+    def save_log(self):
+        os.makedirs(self.log_dir, exist_ok=True)
+        now = datetime.now(BEIJING_TZ)
+        timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
+
+        log_txt_path = os.path.join(self.log_dir, 'desc_database_log.txt')
+        log_json_path = os.path.join(self.log_dir, 'desc_database_log.json')
+
+        channel_counts = self.desc_db.get_channel_counts()
+        sorted_channels = sorted(channel_counts.items(), key=lambda x: -x[1])
+
+        target_channels_set = set(self.target_channels.values())
+        source_names = [s.get('name', 'unknown') for s in self.config.get('desc_sources', [])]
+
+        log_data = {
+            "lastUpdate": timestamp,
+            "type": "epg_aggregation",
+            "whitelistChannels": len(target_channels_set),
+            "matchedChannels": self.stats['channels_with_desc'],
+            "unmatchedChannels": len(target_channels_set) - self.stats['channels_with_desc'],
+            "totalPrograms": self.stats['total_descs'],
+            "dateRange": self.config.get('date_range', 'N/A'),
+            "epgSources": [
+                {
+                    "name": source.get('name', f'source{i}'),
+                    "enabled": True,
+                    "channels": 0,
+                    "programs": 0,
+                    "matched": 0
+                }
+                for i, source in enumerate(self.config.get('desc_sources', []))
+            ],
+            "channels": [
+                {"name": name, "programs": count, "todayPrograms": 0, "source": "desc_db", "aliases": [], "hasGap": False, "gaps": []}
+                for name, count in sorted_channels
+            ]
+        }
+
+        with open(log_txt_path, 'w', encoding='utf-8') as f:
+            f.write(f"EPG聚合日志 - {timestamp}\n")
+            f.write("=" * 50 + "\n\n")
+
+            f.write("📊 统计\n")
+            f.write("-" * 30 + "\n")
+            f.write(f"目标频道数: {log_data['whitelistChannels']}\n")
+            f.write(f"匹配频道数: {log_data['matchedChannels']}\n")
+            f.write(f"未匹配频道数: {log_data['unmatchedChannels']}\n")
+            f.write(f"总Desc数: {log_data['totalPrograms']}\n")
+            f.write(f"处理EPG源数: {self.stats['sources_processed']}\n")
+            f.write(f"新增desc数: {self.stats['new_descs']}\n")
+            f.write(f"去重节目数: {self.stats['deduplicated']}\n")
+            f.write(f"HTML修复数: {self.stats['html_fixed']}\n")
+            f.write(f"无效过滤数: {self.stats['invalid_filtered']}\n\n")
+
+            f.write("📺 各频道desc数量 (Top 50)\n")
+            f.write("-" * 30 + "\n")
+            for name, count in sorted_channels[:50]:
+                f.write(f"{name}: {count}\n")
+
+        with open(log_json_path, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"日志已保存: {log_txt_path}")
+        logger.info(f"JSON日志已保存: {log_json_path}")
+
+    def run(self):
+        logger.info("开始提取Desc")
+
+        self.load_config()
+
+        if not self.load_target_channels():
+            return False
+
+        if self.config.get('accumulate', True):
+            self.load_existing_db()
+
+        for source in self.config.get('desc_sources', []):
+            self.extract_from_source(source, source.get('name', 'unknown'))
+
+        self.save_database()
+        self.save_log()
+
+        logger.info("Desc提取完成")
+        return True
+
+
+def main():
+    parser = argparse.ArgumentParser(description='EPG Desc提取器')
+    parser.add_argument('--config', required=True, help='配置文件路径')
+    parser.add_argument('--output', required=True, help='输出文件路径')
+    parser.add_argument('--log-dir', default='log', help='日志目录 (默认: log)')
+
+    args = parser.parse_args()
+
+    extractor = DescExtractor(args.config, args.output, args.log_dir)
+    success = extractor.run()
+    sys.exit(0 if success else 1)
+
+
+if __name__ == '__main__':
+    main()

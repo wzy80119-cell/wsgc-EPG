@@ -1,0 +1,131 @@
+name: EPG Aggregation
+
+on:
+  schedule:
+    - cron: '20 19 * * *'
+    - cron: '50 20 * * *'
+    - cron: '20 2 * * *'
+    - cron: '20 8 * * *'
+  workflow_dispatch:
+    inputs:
+      run_aggregation:
+        description: '运行 EPG 聚合'
+        required: true
+        default: true
+        type: boolean
+      run_desc_injection:
+        description: '运行 Desc 注入'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  aggregate-epg:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests lxml beautifulsoup4
+    
+    - name: Configure git
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    
+    - name: Run EPG aggregation script
+      if: ${{ github.event_name == 'schedule' || github.event.inputs.run_aggregation == 'true' }}
+      run: |
+        python scripts/aggregate_epg.py \
+          --config config/epg_config.json \
+          --output-dir ./EPG \
+          --log-dir ./log
+    
+    - name: Commit aggregated EPG
+      if: ${{ github.event_name == 'schedule' || github.event.inputs.run_aggregation == 'true' }}
+      run: |
+        git add EPG/wsgc.xml.gz log/aggregation_log.txt log/dashboard_data.json
+        
+        if git diff --staged --quiet; then
+          echo "No changes to aggregated EPG"
+        else
+          git commit -m "EPG聚合 $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          git fetch origin ${{ github.ref_name }}
+          if ! git rebase origin/${{ github.ref_name }} -X theirs; then
+            echo "::warning::Rebase failed, falling back to reset+recommit"
+            git rebase --abort
+            git reset --soft origin/${{ github.ref_name }}
+            git add EPG/wsgc.xml.gz log/aggregation_log.txt log/dashboard_data.json
+            git commit -m "EPG聚合 $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          fi
+          git push
+        fi
+    
+    - name: Inject Desc to EPG
+      if: ${{ github.event_name == 'schedule' || github.event.inputs.run_desc_injection == 'true' }}
+      run: |
+        python scripts/add_desc.py \
+          --input ./EPG/wsgc.xml.gz \
+          --desc-db-url "https://raw.githubusercontent.com/wzy80119-cell/wsgc-EPG/refs/heads/main/database/desc_database.json,https://raw.githubusercontent.com/wzy80119-cell/wsgc-EPG/refs/heads/main/database/apidb.json" \
+          --man-made-url "https://raw.githubusercontent.com/wzy80119-cell/wsgc-EPG/refs/heads/main/database/man-made.json" \
+          --output ./EPG/wsgc-desc.xml.gz \
+          --log ./log/desc_match_log.txt
+      continue-on-error: true
+    
+    - name: Commit EPG with Desc
+      if: ${{ github.event_name == 'schedule' || github.event.inputs.run_desc_injection == 'true' }}
+      run: |
+        git add EPG/wsgc-desc.xml.gz log/desc_match_log.txt log/desc_match_log.json
+
+        if git diff --staged --quiet; then
+          echo "No desc changes"
+        else
+          git commit -m "EPG+Desc $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          git fetch origin ${{ github.ref_name }}
+          if ! git rebase origin/${{ github.ref_name }} -X theirs; then
+            echo "::warning::Rebase failed, falling back to reset+recommit"
+            git rebase --abort
+            git reset --soft origin/${{ github.ref_name }}
+            git add EPG/wsgc-desc.xml.gz log/desc_match_log.txt log/desc_match_log.json
+            git commit -m "EPG+Desc $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          fi
+          git push
+        fi
+    
+    - name: Merge Dashboard Data
+      if: ${{ github.event_name == 'schedule' || github.event.inputs.run_aggregation == 'true' || github.event.inputs.run_desc_injection == 'true' }}
+      run: |
+        python scripts/merge_dashboard_data.py \
+          --epg ./log/dashboard_data.json \
+          --desc ./log/desc_match_log.json \
+          --output ./log/unified_dashboard_data.json
+    
+    - name: Commit Unified Dashboard Data
+      if: ${{ github.event_name == 'schedule' || github.event.inputs.run_aggregation == 'true' || github.event.inputs.run_desc_injection == 'true' }}
+      run: |
+        git add log/unified_dashboard_data.json
+        
+        if git diff --staged --quiet; then
+          echo "No unified data changes"
+        else
+          git commit -m "数据合并 $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          git fetch origin ${{ github.ref_name }}
+          if ! git rebase origin/${{ github.ref_name }} -X theirs; then
+            echo "::warning::Rebase failed, falling back to reset+recommit"
+            git rebase --abort
+            git reset --soft origin/${{ github.ref_name }}
+            git add log/unified_dashboard_data.json
+            git commit -m "数据合并 $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          fi
+          git push
+        fi
