@@ -5,6 +5,10 @@ on:
     - cron: '35 19 * * *'  # UTC 19:35 = 北京时间 03:35
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   extract-desc:
     runs-on: ubuntu-latest

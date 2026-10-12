@@ -12,6 +12,10 @@ on:
   # 手动触发（测试用）
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   process-epg:
     runs-on: ubuntu-latest

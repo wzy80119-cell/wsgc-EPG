@@ -196,13 +196,24 @@ def main():
             else:
                 print(f'⚠ [{name}] 文件不存在: {fp}')
         elif 'url' in src:
-            data = download(src['url'])
+            raw = download(src['url'])
+            data = open_xml(raw) if raw else None
         if data is None:
+            source_stats.append({'name': name, 'enabled': True, 'channels': 0,
+                                 'programs': 0, 'matched': 0})
+            continue
+        if not data.lstrip()[:1] == b'<':
+            print(f'⚠ [{name}] 返回内容不是 XML（前 40 字节: {data[:40]!r}），跳过')
             source_stats.append({'name': name, 'enabled': True, 'channels': 0,
                                  'programs': 0, 'matched': 0})
             continue
 
         chs, progs = parse_source(data)
+        if not chs:
+            print(f'⚠ [{name}] 无有效频道数据，跳过')
+            source_stats.append({'name': name, 'enabled': True, 'channels': 0,
+                                 'programs': 0, 'matched': 0})
+            continue
         matched = 0
         program_count = 0
         for cid, names in chs.items():

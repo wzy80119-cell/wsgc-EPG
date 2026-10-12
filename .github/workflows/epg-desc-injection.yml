@@ -23,6 +23,10 @@ concurrency:
   group: epg-desc-injection
   cancel-in-progress: false
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   # ============================================================
   #  从别家EPG提取desc (extract_desc.py)

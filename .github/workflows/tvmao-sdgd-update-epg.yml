@@ -17,6 +17,10 @@ on:
         default: true
         type: boolean
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   # ============================================================
   #  TVMAO EPG 抓取

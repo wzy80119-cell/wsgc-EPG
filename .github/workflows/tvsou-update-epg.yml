@@ -7,6 +7,10 @@ on:
   
   workflow_dispatch:  # 允许手动触发
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   update-epg:
     runs-on: ubuntu-latest

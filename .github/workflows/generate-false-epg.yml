@@ -12,6 +12,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   generate-false-epg:
     runs-on: ubuntu-latest
