@@ -139,10 +139,8 @@ def overlap_fraction(start, stop, accepted):
         return 1.0
     covered = 0.0
     for a_start, a_stop in accepted:
-        if a_stop <= start:
+        if a_stop <= start or a_start >= stop:
             continue
-        if a_start >= stop:
-            break
         covered += (min(stop, a_stop) - max(start, a_start)).total_seconds()
     return covered / total
 
