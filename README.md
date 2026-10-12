@@ -7,10 +7,24 @@ wsgc-EPG 是一个 IPTV 电子节目指南（EPG）聚合与管理项目。它�
 
 ## 功能特性
 
-- **多源 EPG 聚合**：聚合 山东移动、山东广电、山东联通、海南移动、电视猫 等多源数据
-- **Desc 描述注入**：提取 → 刮削 → 注入节目描述，让节目单信息更丰富
+- **多源 EPG 聚合**：聚合 山东移动、山东广电、山东联通、电视猫、电视家搜、zmt、mxdyeah、epg.pw 等多源数据
+- **Desc 描述注入**：提取 → 注入节目描述，让节目单信息更丰富
 - **自动清洗**：频道名清洗、栏目前缀删除、续集编号保护等规则化处理
 - **每日自动更新**：GitHub Actions 定时聚合、注入并提交
+
+## 在线面板
+
+<https://wzy80119-cell.github.io/wsgc-EPG/>
+
+## 与上游 SD-EPG 的差异
+
+本项目复刻自 `sggc/SD-EPG`（署名已更名往事如风）。上游的部分核心脚本位于作者的私有仓库，本仓库内已等价重建：
+
+- `scripts/aggregate_epg.py`：多源聚合（频道骨架与别名取自 `EPG/wsgc.xml.gz` 现有频道定义，源清单在 `config/epg_config.json`）
+- `scripts/add_desc.py`：Desc 注入（人工数据 → 同频道匹配 → 全局匹配）
+- `scripts/merge_dashboard_data.py`：仪表盘数据合并
+- 已移除依赖私有仓库的功能：TMDB 简介刮削（`fetch-epg-desc.yml`）、山东移动 SDM 抓取（私有脚本，现阶段 `EPG/sdm.xml.gz` 为静态快照）
+- SDGD 抓取需要在仓库 Settings → Secrets 中配置 `SDGD_TOKEN` 与 `SDGD_APP_ID`，未配置时该源跳过
 
 ## 前端面板
 
