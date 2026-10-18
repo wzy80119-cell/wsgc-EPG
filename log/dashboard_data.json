@@ -1,9 +1,9 @@
 {
-  "lastUpdate": "2026-10-19 05:34:11",
+  "lastUpdate": "2026-10-19 06:38:00",
   "whitelistChannels": 657,
   "matchedChannels": 361,
   "unmatchedChannels": 296,
-  "totalPrograms": 31783,
+  "totalPrograms": 31829,
   "filteredPrograms": 11627,
   "dateRange": "20261018 ~ 20261026",
   "aliasCount": 719,
@@ -46,9 +46,9 @@
     {
       "name": "zmt",
       "enabled": true,
-      "channels": 284,
-      "programs": 12417,
-      "matched": 205
+      "channels": 285,
+      "programs": 12463,
+      "matched": 206
     },
     {
       "name": "mxdyeah",
@@ -463,7 +463,6 @@
     "西安影视",
     "西安丝路",
     "厦门综合",
-    "云南影视",
     "贵州公共",
     "贵州影视文艺",
     "贵州大众生活",
@@ -7470,8 +7469,8 @@
     {
       "id": "云南影视",
       "name": "云南影视",
-      "programs": 17,
-      "todayPrograms": 0,
+      "programs": 63,
+      "todayPrograms": 23,
       "source": "epgpw",
       "aliases": [
         "云南影视频道"
