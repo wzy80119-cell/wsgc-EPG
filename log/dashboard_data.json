@@ -1,9 +1,9 @@
 {
-  "lastUpdate": "2026-10-26 05:53:04",
+  "lastUpdate": "2026-10-26 06:49:32",
   "whitelistChannels": 657,
-  "matchedChannels": 355,
-  "unmatchedChannels": 302,
-  "totalPrograms": 31254,
+  "matchedChannels": 359,
+  "unmatchedChannels": 298,
+  "totalPrograms": 31449,
   "filteredPrograms": 10037,
   "dateRange": "20261025 ~ 20261102",
   "aliasCount": 719,
@@ -46,9 +46,9 @@
     {
       "name": "zmt",
       "enabled": true,
-      "channels": 282,
-      "programs": 12385,
-      "matched": 203
+      "channels": 287,
+      "programs": 12580,
+      "matched": 208
     },
     {
       "name": "mxdyeah",
@@ -169,7 +169,6 @@
     "青岛QTV-5",
     "青岛QTV-4",
     "曲阜综合",
-    "山东少儿",
     "惠民综合",
     "招远综合",
     "威海新闻",
@@ -212,9 +211,6 @@
     "泰山综合",
     "莱西综合",
     "滨城TV",
-    "山东新闻",
-    "山东农科",
-    "山东文旅",
     "武汉少儿",
     "武汉经济",
     "武汉文体",
@@ -459,7 +455,6 @@
     "西安影视",
     "西安丝路",
     "厦门综合",
-    "云南影视",
     "贵州公共",
     "贵州影视文艺",
     "贵州大众生活",
@@ -2843,9 +2838,9 @@
     {
       "id": "山东少儿",
       "name": "山东少儿",
-      "programs": 0,
-      "todayPrograms": 0,
-      "source": "",
+      "programs": 24,
+      "todayPrograms": 24,
+      "source": "zmt",
       "aliases": [],
       "hasGap": false,
       "gaps": 0
@@ -3587,9 +3582,9 @@
     {
       "id": "山东新闻",
       "name": "山东新闻",
-      "programs": 0,
-      "todayPrograms": 0,
-      "source": "",
+      "programs": 40,
+      "todayPrograms": 40,
+      "source": "zmt",
       "aliases": [],
       "hasGap": false,
       "gaps": 0
@@ -3627,9 +3622,9 @@
     {
       "id": "山东农科",
       "name": "山东农科",
-      "programs": 0,
-      "todayPrograms": 0,
-      "source": "",
+      "programs": 51,
+      "todayPrograms": 51,
+      "source": "zmt",
       "aliases": [],
       "hasGap": false,
       "gaps": 0
@@ -3663,9 +3658,9 @@
     {
       "id": "山东文旅",
       "name": "山东文旅",
-      "programs": 0,
-      "todayPrograms": 0,
-      "source": "",
+      "programs": 34,
+      "todayPrograms": 34,
+      "source": "zmt",
       "aliases": [],
       "hasGap": false,
       "gaps": 0
@@ -7466,8 +7461,8 @@
     {
       "id": "云南影视",
       "name": "云南影视",
-      "programs": 17,
-      "todayPrograms": 0,
+      "programs": 63,
+      "todayPrograms": 23,
       "source": "epgpw",
       "aliases": [
         "云南影视频道"
